@@ -1,0 +1,334 @@
+:root {
+  --bg: #0b0d12;
+  --panel: rgba(255, 255, 255, 0.06);
+  --panel2: rgba(255, 255, 255, 0.1);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.65);
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #7c5cff;
+  --accent2: #2dd4bf;
+  --danger: #ff4d6d;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(124, 92, 255, 0.25), transparent 60%),
+    radial-gradient(900px 500px at 80% 0%, rgba(45, 212, 191, 0.22), transparent 55%),
+    radial-gradient(900px 700px at 70% 90%, rgba(124, 92, 255, 0.18), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code,
+pre,
+textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 22px;
+}
+
+.appContainer {
+  width: 100%;
+  padding: 18px;
+}
+
+.appContainerWide {
+  width: 100%;
+  padding: 16px;
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.cardInner {
+  padding: 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.scrollX {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+
+.scrollX::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scrollX::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollX::-webkit-scrollbar-thumb {
+  background-color: var(--accent);
+  border-radius: 10px;
+}
+
+.scrollItem {
+  flex: 0 0 400px;
+  min-width: 300px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+@media (min-width: 980px) {
+  .split {
+    grid-template-columns: minmax(0, 420px) 1fr;
+  }
+}
+
+/* Responsive adjustments for main content */
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+  }
+  
+  .appContainer,
+  .appContainerWide {
+    padding: 10px;
+  }
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(124, 92, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.18);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  border-color: rgba(124, 92, 255, 0.55);
+  background: linear-gradient(180deg, rgba(124, 92, 255, 0.35), rgba(124, 92, 255, 0.18));
+}
+
+.btnPrimary:hover {
+  background: linear-gradient(180deg, rgba(124, 92, 255, 0.45), rgba(124, 92, 255, 0.25));
+  border-color: rgba(124, 92, 255, 0.7);
+}
+
+.btnDanger {
+  border-color: rgba(255, 77, 109, 0.45);
+  background: linear-gradient(180deg, rgba(255, 77, 109, 0.25), rgba(255, 77, 109, 0.12));
+}
+
+.btnDanger:hover {
+  background: linear-gradient(180deg, rgba(255, 77, 109, 0.35), rgba(255, 77, 109, 0.2));
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.kbd {
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.error {
+  color: #ffb3c1;
+  border: 1px solid rgba(255, 77, 109, 0.35);
+  background: rgba(255, 77, 109, 0.08);
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+/* Drag and drop enhancements */
+[data-entry-card] {
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-entry-card]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-entry-card]:active {
+  cursor: grabbing;
+}
+
+[data-section-entry] {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+[data-section-entry]:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Smooth scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Page content should take full height but allow overflow within */
+.pageContent {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pageContent > * {
+  min-height: 0;
+}
+
+/* Entry hover effects */
+.entry-item {
+  transition: all 0.15s ease;
+}
+
+.entry-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}

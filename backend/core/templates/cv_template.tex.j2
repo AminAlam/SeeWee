@@ -1,0 +1,176 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\usepackage[hidelinks, colorlinks=true, urlcolor=blue, linkcolor=black, citecolor=black]{hyperref}
+\usepackage[left=0.4in, right=0.4in, top=0.5in, bottom=0.5in]{geometry}
+\usepackage{charter}
+\usepackage{xcolor}
+
+\title{}
+\author{}
+\date{}
+
+% Custom section styling without soul package
+{% raw %}\newcommand{\cvsection}[1]{\vspace{0.15in}\noindent{\Large\textbf{#1}}\vspace{0.08in}\hrule\vspace{0.12in}}{% endraw %}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{ {{- full_name | tex_escape -}} }} \\ \vspace{0.15in}
+    {% set parts = [] %}
+    {% if phone %}{% set _ = parts.append(phone) %}{% endif %}
+    {% if email %}{% set _ = parts.append('\\href{mailto:' ~ email ~ '}{' ~ (email | tex_escape) ~ '}') %}{% endif %}
+    {% if github %}{% set _ = parts.append('\\href{' ~ github ~ '}{GitHub}') %}{% endif %}
+    {% if linkedin %}{% set _ = parts.append('\\href{' ~ linkedin ~ '}{LinkedIn}') %}{% endif %}
+    {% if address %}{% set _ = parts.append(address | tex_escape) %}{% endif %}
+    {{ parts | join(' $\\vert$ ') }}
+\end{center}
+
+\vspace{0.1in}
+
+{% if summary %}
+\cvsection{Executive Summary}
+{{ summary | tex_escape }}
+{% endif %}
+
+{% for section in sections %}
+{% if section.entries and section.title %}
+\cvsection{ {{- section.title | tex_escape -}} }
+
+{% for item in section.entries %}
+{# ============== EXPERIENCE ============== #}
+{% if item.type == 'experience' %}
+\textbf{ {{- item.role | tex_escape -}} }{% if item.lead %} $\vert\vert$ \textbf{ {{- item.lead | tex_escape -}} }{% endif %} \hfill {{ item._dates | default(item.dates, true) | tex_escape }} \\
+\textit{ {{- item.company | tex_escape -}} }{% if item.location %}, {{ item.location | tex_escape }}{% endif %}
+{% if item.highlights %}
+\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
+{% for h in item.highlights %}
+\item {{ h | tex_escape }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+\vspace{0.1in}
+
+{# ============== EDUCATION ============== #}
+{% elif item.type == 'education' %}
+\textbf{ {{- item.school | tex_escape -}} } \hfill {{ item._dates | default(item.dates, true) | tex_escape }} \\
+{{ item.degree | tex_escape }}{% if item.gpa %} $\vert$ GPA: {{ item.gpa | tex_escape }}{% endif %} \\
+{% if item.honors %}\textit{ {{- item.honors | tex_escape -}} }{% endif %}
+{% if item.highlights %}
+\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
+{% for h in item.highlights %}
+\item {{ h | tex_escape }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+\vspace{0.1in}
+
+{# ============== PROJECT ============== #}
+{% elif item.type == 'project' %}
+\textbf{ {{- item.name | tex_escape -}} }{% if item.organization %} -- {{ item.organization | tex_escape }}{% endif %} \hfill {{ item._dates | default(item.dates, true) | tex_escape }}
+{% if item.tech_stack %} \\
+\textit{Tech: {{ item.tech_stack | join(', ') | tex_escape }}}
+{% endif %}
+{% if item.highlights %}
+\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
+{% for h in item.highlights %}
+\item {{ h | tex_escape }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+\vspace{0.1in}
+
+{# ============== PUBLICATION ============== #}
+{% elif item.type == 'publication' %}
+\textbf{ {{- item.title | tex_escape -}} }{% if item.venue %} -- {{ item.venue | tex_escape }}{% endif %}{% if item.year %} {{ item.year | tex_escape }}{% endif %}
+{% if item.authors %} \\
+{{ item.authors | tex_escape }}
+{% endif %}
+
+\vspace{0.1in}
+
+{# ============== SKILL ============== #}
+{% elif item.type == 'skill' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+{% if item.category and item.skill_list %}
+\item \textbf{ {{- item.category | tex_escape -}} }: {{ item.skill_list | join(', ') | tex_escape }}
+{% elif item.name %}
+\item \textbf{ {{- item.name | tex_escape -}} }{% if item.level %} ({{ item.level | tex_escape }}){% endif %}
+{% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== AWARD ============== #}
+{% elif item.type == 'award' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.title | tex_escape -}} }{% if item.date %} ({{ item.date | tex_escape }}){% endif %}{% if item.issuer %} -- {{ item.issuer | tex_escape }}{% endif %}{% if item.description %}: {{ item.description | tex_escape }}{% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== VOLUNTEERING ============== #}
+{% elif item.type == 'volunteering' %}
+\textbf{ {{- item.role | tex_escape -}} }{% if item.organization %} -- {{ item.organization | tex_escape }}{% endif %} \hfill {{ item._dates | default(item.dates, true) | tex_escape }}
+{% if item.highlights %}
+\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
+{% for h in item.highlights %}
+\item {{ h | tex_escape }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+\vspace{0.1in}
+
+{# ============== CERTIFICATION ============== #}
+{% elif item.type == 'certification' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.name | tex_escape -}} }{% if item.issuer %} -- {{ item.issuer | tex_escape }}{% endif %}{% if item.date %} ({{ item.date | tex_escape }}){% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== TALK ============== #}
+{% elif item.type == 'talk' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.title | tex_escape -}} }{% if item.event %} -- {{ item.event | tex_escape }}{% endif %}{% if item.date %} ({{ item.date | tex_escape }}){% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== LANGUAGE ============== #}
+{% elif item.type == 'language' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.name | tex_escape -}} }{% if item.proficiency %} ({{ item.proficiency | tex_escape }}){% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== REFERENCE ============== #}
+{% elif item.type == 'reference' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.name | tex_escape -}} }{% if item.title %}, {{ item.title | tex_escape }}{% endif %}{% if item.organization %} -- {{ item.organization | tex_escape }}{% endif %}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== TEACHING (legacy) ============== #}
+{% elif item.type == 'teaching' %}
+{% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
+\item \textbf{ {{- item.header | tex_escape -}} }{% if item.level %} -- {{ item.level | tex_escape }}{% endif %}{% if item.prof %} -- {{ item.prof | tex_escape }}{% endif %} \hfill {{ item.dates | tex_escape }}
+{% if loop.last %}\end{itemize}{% endif %}
+
+{# ============== FALLBACK (generic) ============== #}
+{% else %}
+\textbf{ {{- item.header | tex_escape -}} } \hfill {{ item.dates | tex_escape }} \\
+{% if item.subheader %}\textit{ {{- item.subheader | tex_escape -}} }{% endif %}
+{% if item.bullets %}
+\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
+{% for b in item.bullets %}
+\item {{ b | tex_escape }}
+{% endfor %}
+\end{itemize}
+{% endif %}
+
+\vspace{0.1in}
+{% endif %}
+
+{% endfor %}
+
+\vspace{0.05in}
+{% endif %}
+{% endfor %}
+
+\end{document}

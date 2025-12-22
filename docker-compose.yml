@@ -1,0 +1,50 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      - SEEWEE_DB_PATH=/data/seewee.db
+      - SEEWEE_CORS_ORIGINS=http://localhost:3000
+      - SEEWEE_LLM_MODE=both
+      - SEEWEE_OLLAMA_BASE_URL=http://ollama:11434
+    ports:
+      - "8000:8000"
+    volumes:
+      - seewee-data:/data
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    environment:
+      - API_BASE_URL=http://api:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - web-node-modules:/app/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  seewee-data:
+  web-node-modules:
+  ollama-data:
+
+

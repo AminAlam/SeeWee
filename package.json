@@ -1,0 +1,14 @@
+{
+  "name": "seewee",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "lint": "npm --workspace apps/web run lint",
+    "build": "npm --workspace apps/web run build"
+  }
+}
+
+

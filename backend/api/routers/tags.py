@@ -14,3 +14,4 @@ def list_tags(db: Session = Depends(db_session)) -> list[str]:
     return TagsRepo(db).list()
 
 
+

@@ -35,3 +35,4 @@ def session_scope(session_factory: sessionmaker[Session]) -> Generator[Session, 
         session.close()
 
 
+

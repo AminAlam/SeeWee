@@ -4,13 +4,17 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from markupsafe import Markup
 
 from core.document_model import Document, DocSection
 from core.entry_schemas import normalize_entry
+from core.markdown_utils import md_to_latex_inline, process_entry_markdown, process_profile_markdown
 
 
 def _tex_escape(s: str) -> str:
-    # Minimal escaping for common LaTeX special chars.
+    """Escape special LaTeX characters for plain text."""
+    if not isinstance(s, str):
+        return str(s) if s is not None else ""
     mapping = {
         "\\": r"\textbackslash{}",
         "&": r"\&",
@@ -24,6 +28,14 @@ def _tex_escape(s: str) -> str:
         "^": r"\textasciicircum{}",
     }
     return "".join(mapping.get(ch, ch) for ch in s)
+
+
+def _md_to_tex(s: str) -> Markup:
+    """Convert Markdown to LaTeX and mark as safe (no further escaping)."""
+    if not isinstance(s, str):
+        return Markup(str(s) if s is not None else "")
+    result = md_to_latex_inline(s)
+    return Markup(result)
 
 
 def _as_str(v: Any) -> str:
@@ -79,6 +91,9 @@ def _normalize_section(section: DocSection) -> dict[str, Any]:
     for it in section.items:
         # Use the schema-based normalization
         normalized = normalize_entry(it.entry_type, it.data or {})
+        
+        # Process markdown fields for LaTeX
+        normalized = process_entry_markdown(normalized, target='latex')
 
         # Build common fields for backward compatibility
         header = _as_str(
@@ -95,7 +110,7 @@ def _normalize_section(section: DocSection) -> dict[str, Any]:
         # Dates - use computed _dates or build from start/end
         dates = _as_str(normalized.get("_dates") or normalized.get("date") or normalized.get("year") or "")
 
-        # Bullets/highlights
+        # Bullets/highlights (already markdown-processed)
         bullets = normalized.get("highlights") or []
         if not bullets and normalized.get("skill_list"):
             bullets = normalized.get("skill_list", [])
@@ -107,7 +122,7 @@ def _normalize_section(section: DocSection) -> dict[str, Any]:
             "dates": dates,
             "bullets": bullets,
             "type": it.entry_type,
-            # Type-specific fields (all normalized)
+            # Type-specific fields (all normalized and markdown-processed)
             **normalized,
         })
     return {"id": section.id, "title": _section_title_for_variant_section(section.id), "entries": items, "type": section.id}
@@ -124,12 +139,15 @@ def render_latex_template(doc: Document, profile: dict[str, Any]) -> str:
         lstrip_blocks=True,
     )
     env.filters["tex_escape"] = _tex_escape
+    env.filters["md_tex"] = _md_to_tex  # Markdown to LaTeX filter
 
     tpl = env.get_template("cv_template.tex.j2")
 
-    links = (profile or {}).get("links") or {}
-    personal = (profile or {}).get("personal") or {}
-    content = (profile or {}).get("content") or {}
+    # Process profile markdown
+    processed_profile = process_profile_markdown(profile or {}, target='latex')
+    links = processed_profile.get("links") or {}
+    personal = processed_profile.get("personal") or {}
+    content = processed_profile.get("content") or {}
 
     ctx = {
         "full_name": personal.get("full_name", "Your Name"),

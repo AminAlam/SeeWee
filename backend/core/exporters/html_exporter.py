@@ -5,6 +5,7 @@ from typing import Any
 
 from core.document_model import Document
 from core.entry_schemas import normalize_entry
+from core.markdown_utils import process_entry_markdown, process_profile_markdown
 
 
 def _safe_json(obj: Any) -> str:
@@ -12,17 +13,20 @@ def _safe_json(obj: Any) -> str:
 
 
 def _normalize_items_for_html(doc: Document) -> list[dict]:
-    """Normalize all items using the schema registry for consistent rendering."""
+    """Normalize all items using the schema registry and process markdown for HTML."""
     sections = []
     for s in doc.sections:
         items = []
         for i in s.items:
             normalized = normalize_entry(i.entry_type, i.data or {})
+            # Process markdown fields for HTML output
+            normalized = process_entry_markdown(normalized, target='html')
+            data_html = process_entry_markdown(i.data or {}, target='html')
             items.append({
                 "entry_id": i.entry_id,
                 "entry_type": i.entry_type,
                 "tags": i.tags,
-                "data": i.data,
+                "data": data_html,
                 "normalized": normalized,
             })
         sections.append({
@@ -39,21 +43,21 @@ def render_html_bundle(doc: Document) -> dict[str, str]:
     """
     sections = _normalize_items_for_html(doc)
     doc_json = _safe_json({
-        "variant_id": doc.variant_id,
-        "generated_at": doc.generated_at.isoformat(),
+            "variant_id": doc.variant_id,
+            "generated_at": doc.generated_at.isoformat(),
         "sections": sections,
     })
 
     index_html = f"""<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SeeWee CV</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SeeWee CV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
-  <style>
+    <style>
     * {{ box-sizing: border-box; }}
     body {{
       font-family: 'Source Serif 4', Georgia, serif;
@@ -176,9 +180,9 @@ def render_html_bundle(doc: Document) -> dict[str, str]:
       color: #888;
       margin-top: 4px;
     }}
-  </style>
-</head>
-<body>
+    </style>
+  </head>
+  <body>
   <div class="container">
     <header>
       <h1>Curriculum Vitae</h1>
@@ -186,11 +190,11 @@ def render_html_bundle(doc: Document) -> dict[str, str]:
     </header>
     <main id="root"></main>
   </div>
-  <script>
-    window.SEEWEE_DOC = {doc_json};
-  </script>
-  <script src="./app.js"></script>
-</body>
+    <script>
+      window.SEEWEE_DOC = {doc_json};
+    </script>
+    <script src="./app.js"></script>
+  </body>
 </html>
 """
 
@@ -230,7 +234,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -274,7 +278,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -320,7 +324,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -406,7 +410,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -442,7 +446,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -574,55 +578,58 @@ function renderEntry(item, sectionId) {
   
   const highlights = d.highlights || d.bullets || [];
   if (highlights.length) {
-    const ul = document.createElement("ul");
+          const ul = document.createElement("ul");
     highlights.forEach(h => {
       if (h && h.trim()) {
-        const li = document.createElement("li");
-        li.textContent = h;
-        ul.appendChild(li);
+            const li = document.createElement("li");
+        li.innerHTML = h;
+            ul.appendChild(li);
       }
-    });
+          });
     div.appendChild(ul);
-  }
+        }
   
   return div;
-}
+      }
 
-function render() {
-  const root = document.getElementById("root");
-  const doc = window.SEEWEE_DOC;
-  root.innerHTML = "";
+      function render() {
+        const root = document.getElementById("root");
+        const doc = window.SEEWEE_DOC;
+        root.innerHTML = "";
   
   (doc.sections || []).forEach(s => {
-    if (!s.items || s.items.length === 0) return;
+          if (!s.items || s.items.length === 0) return;
     
-    const section = document.createElement("section");
-    const h2 = document.createElement("h2");
-    h2.textContent = s.title;
-    section.appendChild(h2);
+          const section = document.createElement("section");
+          const h2 = document.createElement("h2");
+          h2.textContent = s.title;
+          section.appendChild(h2);
     
     s.items.forEach(item => {
       section.appendChild(renderEntry(item, s.id));
-    });
+          });
     
-    root.appendChild(section);
-  });
-}
+          root.appendChild(section);
+        });
+      }
 
-render();
-"""
+      render();
+    """
 
     return {"index.html": index_html, "app.js": app_js}
 
 
 def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) -> str:
     """
-    Academic Pages style website - sidebar with profile, main content with sections.
-    Modern, clean web design for personal academic/professional homepage.
+    Modern responsive CV website - Bootstrap-style fluid layout.
+    Clean, professional design optimized for all screen sizes.
     """
-    links = (profile or {}).get("links") or {}
-    personal = (profile or {}).get("personal") or {}
-    content = (profile or {}).get("content") or {}
+    # Process profile markdown for HTML
+    processed_profile = process_profile_markdown(profile or {}, target='html')
+    
+    links = processed_profile.get("links") or {}
+    personal = processed_profile.get("personal") or {}
+    content = processed_profile.get("content") or {}
 
     full_name = personal.get("full_name", "Your Name")
     tagline = content.get("tagline", "Researcher & Engineer")
@@ -645,100 +652,148 @@ def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) ->
     twitter = links.get("twitter", "")
     scholar = links.get("scholar", "")
 
-    # Build social links
+    # Build social links as icon buttons
     social_links = []
     if email:
-        social_links.append(f'<a href="mailto:{email}" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>{email}</span></a>')
+        social_links.append(f'<a href="mailto:{email}" class="social-btn" title="Email"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></a>')
     if github:
-        social_links.append(f'<a href="{github}" target="_blank" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg><span>GitHub</span></a>')
+        social_links.append(f'<a href="{github}" target="_blank" class="social-btn" title="GitHub"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg></a>')
     if linkedin:
-        social_links.append(f'<a href="{linkedin}" target="_blank" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg><span>LinkedIn</span></a>')
+        social_links.append(f'<a href="{linkedin}" target="_blank" class="social-btn" title="LinkedIn"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg></a>')
     if scholar:
-        social_links.append(f'<a href="{scholar}" target="_blank" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5.242 13.769L0 9.5 12 0l12 9.5-5.242 4.269C17.548 11.249 14.978 9.5 12 9.5c-2.977 0-5.548 1.748-6.758 4.269zM12 10a7 7 0 1 0 0 14 7 7 0 0 0 0-14z"/></svg><span>Scholar</span></a>')
+        social_links.append(f'<a href="{scholar}" target="_blank" class="social-btn" title="Google Scholar"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M5.242 13.769L0 9.5 12 0l12 9.5-5.242 4.269C17.548 11.249 14.978 9.5 12 9.5c-2.977 0-5.548 1.748-6.758 4.269zM12 10a7 7 0 1 0 0 14 7 7 0 0 0 0-14z"/></svg></a>')
     if twitter:
-        social_links.append(f'<a href="{twitter}" target="_blank" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span>X/Twitter</span></a>')
+        social_links.append(f'<a href="{twitter}" target="_blank" class="social-btn" title="X/Twitter"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>')
     if website:
-        social_links.append(f'<a href="{website}" target="_blank" class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg><span>Website</span></a>')
-    if phone:
-        social_links.append(f'<div class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>{phone}</span></div>')
-    if address:
-        social_links.append(f'<div class="social-link"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg><span>{address}</span></div>')
+        social_links.append(f'<a href="{website}" target="_blank" class="social-btn" title="Website"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></a>')
 
-    social_html = "\n".join(social_links)
+    social_html = "\n        ".join(social_links)
+    
+    # Contact info for header
+    contact_parts = []
+    if email:
+        contact_parts.append(f'<a href="mailto:{email}">{email}</a>')
+    if phone:
+        contact_parts.append(f'<span>{phone}</span>')
+    if address:
+        contact_parts.append(f'<span>{address}</span>')
+    contact_html = ' <span class="sep">•</span> '.join(contact_parts)
 
     # Build navigation from sections
     nav_items = []
     for s in sections:
         if s["items"]:
-            nav_items.append(f'<a href="#{s["id"]}" class="nav-link">{s["title"]}</a>')
-    nav_html = "\n".join(nav_items)
+            nav_items.append(f'<a href="#{s["id"]}" class="nav-pill">{s["title"]}</a>')
+    nav_html = "\n        ".join(nav_items)
 
     html = f"""<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{full_name}</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{full_name} - CV</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
     
-    :root {{
-      --bg-primary: #f8fafc;
-      --bg-sidebar: #1e293b;
+      :root {{
+      --bg: #f0f4f8;
       --bg-card: #ffffff;
-      --text-primary: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #64748b;
-      --text-sidebar: #e2e8f0;
-      --text-sidebar-muted: #94a3b8;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
+      --text: #1a202c;
+      --text-secondary: #4a5568;
+      --text-muted: #718096;
+      --accent: #4f46e5;
+      --accent-light: #818cf8;
+      --accent-bg: rgba(79, 70, 229, 0.08);
       --border: #e2e8f0;
-      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.04);
+      --radius: 12px;
+      --radius-lg: 16px;
     }}
+    
+    html {{ scroll-behavior: smooth; }}
     
     body {{
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       line-height: 1.6;
       font-size: 15px;
+      -webkit-font-smoothing: antialiased;
     }}
     
-    .layout {{
-      display: grid;
-      grid-template-columns: 300px 1fr;
-      min-height: 100vh;
+    /* Container system - Bootstrap-like */
+    .container {{
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 16px;
+    }}
+    @media (min-width: 576px) {{ .container {{ max-width: 540px; padding: 0 20px; }} }}
+    @media (min-width: 768px) {{ .container {{ max-width: 720px; }} }}
+    @media (min-width: 992px) {{ .container {{ max-width: 960px; }} }}
+    @media (min-width: 1200px) {{ .container {{ max-width: 1140px; }} }}
+    @media (min-width: 1400px) {{ .container {{ max-width: 1320px; }} }}
+    
+    .container-fluid {{ width: 100%; padding: 0 16px; }}
+    @media (min-width: 768px) {{ .container-fluid {{ padding: 0 32px; }} }}
+    
+    /* Header */
+    .header {{
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+      color: white;
+      padding: 48px 0 80px;
+      position: relative;
+      overflow: hidden;
     }}
     
-    /* Sidebar */
-    .sidebar {{
-      background: var(--bg-sidebar);
-      color: var(--text-sidebar);
-      padding: 40px 28px;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
+    .header::before {{
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      opacity: 0.5;
+    }}
+    
+    .header-content {{
+      position: relative;
+      z-index: 1;
+    }}
+    
+    .profile-section {{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 20px;
+    }}
+    
+    @media (min-width: 768px) {{
+      .profile-section {{
+        flex-direction: row;
+        text-align: left;
+        gap: 32px;
+      }}
     }}
     
     .avatar {{
-      width: 140px;
-      height: 140px;
+      width: 120px;
+      height: 120px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      margin: 0 auto 24px;
+      background: linear-gradient(135deg, #f472b6 0%, #a78bfa 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 48px;
-      font-weight: 700;
+      font-size: 42px;
+      font-weight: 800;
       color: white;
       text-transform: uppercase;
+      flex-shrink: 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border: 4px solid rgba(255,255,255,0.2);
     }}
     
     .avatar img {{
@@ -748,135 +803,201 @@ def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) ->
       object-fit: cover;
     }}
     
+    .profile-info {{ flex: 1; }}
+    
     .name {{
-      font-size: 24px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 8px;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }}
+    
+    @media (min-width: 768px) {{
+      .name {{ font-size: 40px; }}
     }}
     
     .tagline {{
-      font-size: 14px;
-      color: var(--text-sidebar-muted);
-      text-align: center;
-      margin-bottom: 28px;
+      font-size: 16px;
+      color: rgba(255,255,255,0.75);
+      font-weight: 500;
+      margin-bottom: 16px;
     }}
     
-    .social-links {{
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 32px;
-      padding-bottom: 28px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }}
-    
-    .social-link {{
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: var(--text-sidebar-muted);
-      text-decoration: none;
+    .contact-row {{
       font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }}
+    
+    @media (min-width: 768px) {{
+      .contact-row {{ justify-content: flex-start; }}
+    }}
+    
+    .contact-row a {{
+      color: rgba(255,255,255,0.9);
+      text-decoration: none;
       transition: color 0.2s;
     }}
     
-    .social-link:hover {{
-      color: var(--text-sidebar);
-    }}
+    .contact-row a:hover {{ color: white; text-decoration: underline; }}
+    .contact-row .sep {{ opacity: 0.4; }}
     
-    .social-link svg {{
-      flex-shrink: 0;
-      opacity: 0.7;
-    }}
-    
-    .social-link span {{
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }}
-    
-    .nav {{
+    .social-row {{
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      gap: 8px;
+      margin-top: 16px;
+      justify-content: center;
     }}
     
-    .nav-link {{
-      display: block;
-      padding: 10px 14px;
-      color: var(--text-sidebar-muted);
-      text-decoration: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
+    @media (min-width: 768px) {{
+      .social-row {{ justify-content: flex-start; }}
+    }}
+    
+    .social-btn {{
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.8);
       transition: all 0.2s;
+      backdrop-filter: blur(4px);
     }}
     
-    .nav-link:hover {{
-      background: rgba(255,255,255,0.08);
-      color: var(--text-sidebar);
+    .social-btn:hover {{
+      background: rgba(255,255,255,0.2);
+      color: white;
+      transform: translateY(-2px);
+    }}
+    
+    /* Navigation */
+    .nav-bar {{
+      background: var(--bg-card);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      margin-top: -48px;
+    }}
+    
+    .nav-inner {{
+      display: flex;
+      gap: 6px;
+      padding: 12px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }}
+    
+    .nav-inner::-webkit-scrollbar {{ display: none; }}
+    
+    .nav-pill {{
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s;
+      background: transparent;
+    }}
+    
+    .nav-pill:hover {{
+      background: var(--accent-bg);
+      color: var(--accent);
     }}
     
     /* Main Content */
     .main {{
-      padding: 48px 56px;
-      max-width: 900px;
+      padding: 32px 0 64px;
     }}
     
     .bio {{
       font-size: 16px;
       line-height: 1.8;
       color: var(--text-secondary);
-      margin-bottom: 48px;
-      padding: 24px 28px;
+      padding: 24px;
       background: var(--bg-card);
-      border-radius: 12px;
+      border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
+      margin-bottom: 32px;
       border-left: 4px solid var(--accent);
     }}
     
     section {{
-      margin-bottom: 48px;
+      margin-bottom: 40px;
     }}
     
     h2 {{
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 700;
-      color: var(--text-primary);
+      color: var(--text);
       margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid var(--border);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+    }}
+    
+    h2::before {{
+      content: '';
+      width: 4px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 2px;
+    }}
+    
+    /* Entry Grid */
+    .entry-grid {{
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr;
+    }}
+    
+    @media (min-width: 768px) {{
+      .entry-grid {{ grid-template-columns: repeat(2, 1fr); }}
+    }}
+    
+    @media (min-width: 1200px) {{
+      .entry-grid.cols-3 {{ grid-template-columns: repeat(3, 1fr); }}
     }}
     
     .entry {{
       background: var(--bg-card);
-      border-radius: 10px;
-      padding: 20px 24px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow);
-      transition: box-shadow 0.2s;
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
     }}
     
     .entry:hover {{
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow);
+      border-color: var(--accent-light);
+      transform: translateY(-2px);
     }}
     
     .entry-header {{
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 16px;
+      gap: 12px;
       margin-bottom: 8px;
     }}
     
     .entry-title {{
-      font-weight: 600;
-      font-size: 16px;
-      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text);
+      flex: 1;
     }}
     
     .entry-title a {{
@@ -884,76 +1005,115 @@ def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) ->
       text-decoration: none;
     }}
     
-    .entry-title a:hover {{
-      text-decoration: underline;
-    }}
+    .entry-title a:hover {{ text-decoration: underline; }}
     
     .entry-date {{
-      font-size: 13px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      background: var(--bg-primary);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-bg);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }}
     
     .entry-subtitle {{
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-secondary);
       margin-bottom: 8px;
+      font-weight: 500;
     }}
     
     .entry-meta {{
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-muted);
       margin-bottom: 8px;
     }}
     
     .entry-body {{
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-secondary);
-      line-height: 1.7;
+      line-height: 1.6;
+      flex: 1;
     }}
     
     ul {{
-      margin: 10px 0 0 0;
-      padding-left: 20px;
+      margin: 8px 0 0 0;
+      padding-left: 18px;
     }}
     
     li {{
-      margin: 6px 0;
+      margin: 4px 0;
       color: var(--text-secondary);
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 13px;
+      line-height: 1.5;
     }}
     
+    /* Skills Grid */
     .skill-grid {{
       display: grid;
       gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     }}
     
     .skill-row {{
       background: var(--bg-card);
-      padding: 14px 18px;
-      border-radius: 8px;
+      padding: 16px 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }}
+    
+    .skill-row:hover {{
+      border-color: var(--accent-light);
       box-shadow: var(--shadow);
     }}
     
     .skill-category {{
-      font-weight: 600;
+      font-weight: 700;
       color: var(--accent);
-      margin-right: 8px;
+      font-size: 13px;
+      display: block;
+      margin-bottom: 6px;
     }}
     
     .skill-items {{
       color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.6;
+    }}
+    
+    /* Publications */
+    .pub-entry {{
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+      transition: all 0.2s;
+    }}
+    
+    .pub-entry:hover {{
+      border-color: var(--accent-light);
+      box-shadow: var(--shadow);
     }}
     
     .pub-title {{
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 4px;
+      font-weight: 700;
+      color: var(--text);
+      font-size: 15px;
+      margin-bottom: 6px;
     }}
+    
+    .pub-title a {{
+      color: var(--accent);
+      text-decoration: none;
+    }}
+    
+    .pub-title a:hover {{ text-decoration: underline; }}
     
     .pub-meta {{
       font-size: 13px;
@@ -961,6 +1121,7 @@ def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) ->
       font-style: italic;
     }}
     
+    /* Languages */
     .lang-grid {{
       display: flex;
       flex-wrap: wrap;
@@ -969,75 +1130,102 @@ def render_academicpages_like_preview(doc: Document, profile: dict[str, Any]) ->
     
     .lang-item {{
       background: var(--bg-card);
-      padding: 12px 18px;
-      border-radius: 8px;
-      box-shadow: var(--shadow);
+      padding: 14px 20px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      min-width: 140px;
+      transition: all 0.2s;
+    }}
+    
+    .lang-item:hover {{
+      border-color: var(--accent-light);
+      transform: translateY(-2px);
     }}
     
     .lang-name {{
-      font-weight: 600;
-      color: var(--text-primary);
+      font-weight: 700;
+      color: var(--text);
+      font-size: 14px;
     }}
     
     .lang-level {{
-      font-size: 13px;
+      font-size: 12px;
       color: var(--text-muted);
+      margin-top: 2px;
     }}
     
-    /* Responsive */
-    @media (max-width: 900px) {{
-      .layout {{
-        grid-template-columns: 1fr;
-      }}
-      .sidebar {{
-        position: relative;
-        height: auto;
-        padding: 32px 24px;
-      }}
-      .main {{
-        padding: 32px 24px;
-      }}
+    /* Footer */
+    .footer {{
+      text-align: center;
+      padding: 32px 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
     }}
-  </style>
-</head>
-<body>
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="avatar">
-        {"<img src='" + avatar + "' alt='" + full_name + "'>" if avatar else full_name[:2]}
-      </div>
-      <h1 class="name">{full_name}</h1>
-      <p class="tagline">{tagline}</p>
-      
-      <div class="social-links">
-        {social_html}
-      </div>
-      
-      <nav class="nav">
-        {nav_html}
-      </nav>
-    </aside>
     
-    <main class="main">
-      {"<div class='bio'>" + summary + "</div>" if summary else ""}
-      <div id="root"></div>
-    </main>
-  </div>
+    /* Print styles */
+    @media print {{
+      .nav-bar {{ display: none; }}
+      .header {{ padding: 24px 0; }}
+      .entry, .skill-row, .pub-entry, .lang-item {{ box-shadow: none; border: 1px solid #ddd; }}
+      }}
+    </style>
+  </head>
+  <body>
+  <header class="header">
+    <div class="container header-content">
+      <div class="profile-section">
+        <div class="avatar">
+          {"<img src='" + avatar + "' alt='" + full_name + "'>" if avatar else full_name[:2] if full_name else "CV"}
+        </div>
+        <div class="profile-info">
+          <h1 class="name">{full_name}</h1>
+          <p class="tagline">{tagline}</p>
+          <div class="contact-row">{contact_html}</div>
+          <div class="social-row">
+            {social_html}
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
   
-  <script>
-    window.SEEWEE_DOC = {doc_json};
-  </script>
-  <script>
+  <nav class="nav-bar">
+    <div class="container">
+      <div class="nav-inner">
+        {nav_html}
+      </div>
+    </div>
+  </nav>
+  
+  <main class="main">
+    <div class="container">
+      {"<div class='bio'>" + summary + "</div>" if summary else ""}
+        <div id="root"></div>
+    </div>
+      </main>
+  
+  <footer class="footer">
+    <div class="container">
+      Generated by SeeWee CV Manager
+    </div>
+  </footer>
+
+    <script>
+      window.SEEWEE_DOC = {doc_json};
+    </script>
+    <script>
 {_get_academicpages_render_script()}
-  </script>
-</body>
+    </script>
+  </body>
 </html>
 """
     return html
 
 
 def _get_academicpages_render_script() -> str:
-    """JavaScript for Academic Pages style rendering."""
+    """JavaScript for modern responsive CV rendering."""
     return r"""
 function renderEntry(item, sectionId) {
   const d = item.data || {};
@@ -1056,10 +1244,13 @@ function renderEntry(item, sectionId) {
     title.textContent = n.role || d.role || d.title || "Position";
     if (n.lead) title.textContent += " / " + n.lead;
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n._dates || d.dates || "";
-    header.appendChild(date);
+    const dateStr = n._dates || d.dates || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     const parts = [n.company || d.company || d.org, n.location || d.location].filter(Boolean);
@@ -1076,7 +1267,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1093,10 +1284,13 @@ function renderEntry(item, sectionId) {
     title.className = "entry-title";
     title.textContent = n.degree || d.degree || "Degree";
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n._dates || d.dates || [d.start_date, d.end_date].filter(Boolean).join(" - ");
-    header.appendChild(date);
+    const dateStr = n._dates || d.dates || [d.start_date, d.end_date].filter(Boolean).join(" - ");
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     const subtitle = document.createElement("div");
@@ -1119,7 +1313,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1145,10 +1339,13 @@ function renderEntry(item, sectionId) {
       title.textContent = name;
     }
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n._dates || d.dates || "";
-    if (date.textContent) header.appendChild(date);
+    const dateStr = n._dates || d.dates || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     const techStack = n.tech_stack || d.tech_stack || [];
@@ -1165,7 +1362,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1176,6 +1373,7 @@ function renderEntry(item, sectionId) {
   
   // PUBLICATION
   if (type === "publication") {
+    div.className = "pub-entry";
     const titleDiv = document.createElement("div");
     titleDiv.className = "pub-title";
     const pubTitle = n.title || d.title || "Publication";
@@ -1184,7 +1382,6 @@ function renderEntry(item, sectionId) {
       a.href = n.link || d.link;
       a.textContent = pubTitle;
       a.target = "_blank";
-      a.style.color = "var(--accent)";
       titleDiv.appendChild(a);
     } else {
       titleDiv.textContent = pubTitle;
@@ -1208,12 +1405,12 @@ function renderEntry(item, sectionId) {
   if (type === "skill") {
     div.className = "skill-row";
     const category = n.category || d.category || n.name || d.name || "Skills";
-    const items = n.items || d.items || [];
+    const items = n.skill_list || n.items || d.skill_list || d.items || [];
     if (items.length) {
-      div.innerHTML = '<span class="skill-category">' + category + ':</span><span class="skill-items">' + items.join(", ") + '</span>';
+      div.innerHTML = '<span class="skill-category">' + category + '</span><span class="skill-items">' + items.join(", ") + '</span>';
     } else if (n.name || d.name) {
       const level = n.level || d.level;
-      div.innerHTML = '<span class="skill-category">' + (n.name || d.name) + '</span>' + (level ? ' <span class="skill-items">(' + level + ')</span>' : '');
+      div.innerHTML = '<span class="skill-category">' + (n.name || d.name) + '</span>' + (level ? '<span class="skill-items">' + level + '</span>' : '');
     }
     return div;
   }
@@ -1226,10 +1423,13 @@ function renderEntry(item, sectionId) {
     title.className = "entry-title";
     title.textContent = n.title || d.title || d.name || "Award";
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n.date || d.date || d.year || "";
-    if (date.textContent) header.appendChild(date);
+    const dateStr = n.date || d.date || d.year || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     if (n.issuer || d.issuer) {
@@ -1256,10 +1456,13 @@ function renderEntry(item, sectionId) {
     title.className = "entry-title";
     title.textContent = n.role || d.role || d.title || "Role";
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n._dates || d.dates || "";
-    if (date.textContent) header.appendChild(date);
+    const dateStr = n._dates || d.dates || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     if (n.organization || d.organization) {
@@ -1275,7 +1478,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1301,10 +1504,13 @@ function renderEntry(item, sectionId) {
       title.textContent = name;
     }
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n.date || d.date || "";
-    if (date.textContent) header.appendChild(date);
+    const dateStr = n.date || d.date || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     if (n.issuer || d.issuer) {
@@ -1333,10 +1539,13 @@ function renderEntry(item, sectionId) {
       title.textContent = talkTitle;
     }
     header.appendChild(title);
-    const date = document.createElement("span");
-    date.className = "entry-date";
-    date.textContent = n.date || d.date || "";
-    if (date.textContent) header.appendChild(date);
+    const dateStr = n.date || d.date || "";
+    if (dateStr) {
+      const date = document.createElement("span");
+      date.className = "entry-date";
+      date.textContent = dateStr;
+      header.appendChild(date);
+    }
     div.appendChild(header);
     
     const eventParts = [n.event || d.event, n.location || d.location].filter(Boolean);
@@ -1354,7 +1563,7 @@ function renderEntry(item, sectionId) {
     div.className = "lang-item";
     const name = n.name || d.name || d.language || "Language";
     const prof = n.proficiency || d.proficiency || d.level || "";
-    div.innerHTML = '<span class="lang-name">' + name + '</span>' + (prof ? '<br><span class="lang-level">' + prof + '</span>' : '');
+    div.innerHTML = '<div class="lang-name">' + name + '</div>' + (prof ? '<div class="lang-level">' + prof + '</div>' : '');
     return div;
   }
   
@@ -1394,10 +1603,13 @@ function renderEntry(item, sectionId) {
   title.className = "entry-title";
   title.textContent = d.title || d.role || d.name || d.header || type;
   header.appendChild(title);
-  const date = document.createElement("span");
-  date.className = "entry-date";
-  date.textContent = d.dates || d.date || n._dates || "";
-  if (date.textContent) header.appendChild(date);
+  const dateStr = d.dates || d.date || n._dates || "";
+  if (dateStr) {
+    const date = document.createElement("span");
+    date.className = "entry-date";
+    date.textContent = dateStr;
+    header.appendChild(date);
+  }
   div.appendChild(header);
   
   const org = d.org || d.organization || d.company || d.subheader || "";
@@ -1414,7 +1626,7 @@ function renderEntry(item, sectionId) {
     highlights.forEach(h => {
       if (h && h.trim()) {
         const li = document.createElement("li");
-        li.textContent = h;
+        li.innerHTML = h;
         ul.appendChild(li);
       }
     });
@@ -1438,28 +1650,35 @@ function render() {
     h2.textContent = s.title;
     section.appendChild(h2);
     
-    // Special handling for skills - use grid
-    if (s.id === "skills") {
+    // Skills - use skill grid
+    if (s.id === "skills" || s.items[0]?.entry_type === "skill") {
       const grid = document.createElement("div");
       grid.className = "skill-grid";
-      s.items.forEach(item => {
-        grid.appendChild(renderEntry(item, s.id));
-      });
+      s.items.forEach(item => grid.appendChild(renderEntry(item, s.id)));
       section.appendChild(grid);
     }
-    // Special handling for languages - use flex grid
-    else if (s.id === "languages") {
+    // Languages - use flex grid
+    else if (s.id === "languages" || s.items[0]?.entry_type === "language") {
       const grid = document.createElement("div");
       grid.className = "lang-grid";
-      s.items.forEach(item => {
-        grid.appendChild(renderEntry(item, s.id));
-      });
+      s.items.forEach(item => grid.appendChild(renderEntry(item, s.id)));
       section.appendChild(grid);
     }
+    // Publications - linear list
+    else if (s.id === "publications" || s.items[0]?.entry_type === "publication") {
+      s.items.forEach(item => section.appendChild(renderEntry(item, s.id)));
+    }
+    // Default - responsive 2-column grid
     else {
-      s.items.forEach(item => {
-        section.appendChild(renderEntry(item, s.id));
-      });
+      const grid = document.createElement("div");
+      grid.className = "entry-grid";
+      // Use 3-col for certifications, awards
+      if (s.id === "certifications" || s.id === "awards" || 
+          s.items[0]?.entry_type === "certification" || s.items[0]?.entry_type === "award") {
+        grid.classList.add("cols-3");
+      }
+      s.items.forEach(item => grid.appendChild(renderEntry(item, s.id)));
+      section.appendChild(grid);
     }
     
     root.appendChild(section);
@@ -1507,7 +1726,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1551,7 +1770,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1597,7 +1816,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1683,7 +1902,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1719,7 +1938,7 @@ function renderEntry(item, sectionId) {
       highlights.forEach(h => {
         if (h && h.trim()) {
           const li = document.createElement("li");
-          li.textContent = h;
+          li.innerHTML = h;
           ul.appendChild(li);
         }
       });
@@ -1855,7 +2074,7 @@ function renderEntry(item, sectionId) {
     highlights.forEach(h => {
       if (h && h.trim()) {
         const li = document.createElement("li");
-        li.textContent = h;
+        li.innerHTML = h;
         ul.appendChild(li);
       }
     });

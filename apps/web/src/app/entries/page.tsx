@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SaveIndicator } from "@/hooks/useAutosave";
 
 type Entry = {
   id: string;
@@ -11,21 +12,22 @@ type Entry = {
   updated_at: string;
 };
 
-type SchemaProperty = {
-  type: string;
-  title?: string;
+type SchemaField = {
+  name: string;
+  label: string;
+  type: "text" | "textarea" | "list" | "date";
   description?: string;
-  default?: unknown;
-  format?: string;
-  items?: { type: string };
+  required?: boolean;
 };
 
 type Schema = {
-  title: string;
   type: string;
-  properties: Record<string, SchemaProperty>;
-  required?: string[];
+  label: string;
+  fields: SchemaField[];
+  default: Record<string, unknown>;
 };
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const TYPE_COLORS: Record<string, string> = {
   experience: "rgba(74, 167, 255, 0.2)",
@@ -65,23 +67,20 @@ function entrySubtitle(e: Entry): string {
   );
 }
 
-function FormField({ propKey, prop, value, onChange }: {
-  propKey: string;
-  prop: SchemaProperty;
+function FormField({ field, value, onChange }: {
+  field: SchemaField;
   value: unknown;
   onChange: (key: string, value: unknown) => void;
 }) {
-  const label = prop.title || propKey;
-  
-  if (prop.type === "array" && prop.items?.type === "string") {
+  if (field.type === "list") {
     const arrValue = Array.isArray(value) ? value : [];
     return (
       <label className="label">
-        <span style={{ fontSize: 12 }}>{label}</span>
+        <span style={{ fontSize: 12 }}>{field.label}</span>
         <textarea
           className="textarea"
           value={arrValue.join("\n")}
-          onChange={(e) => onChange(propKey, e.target.value.split("\n").filter(Boolean))}
+          onChange={(e) => onChange(field.name, e.target.value.split("\n").filter(Boolean))}
           style={{ minHeight: 80, fontSize: 12 }}
           placeholder="One item per line..."
         />
@@ -89,16 +88,31 @@ function FormField({ propKey, prop, value, onChange }: {
     );
   }
 
+  if (field.type === "textarea") {
+    return (
+      <label className="label">
+        <span style={{ fontSize: 12 }}>{field.label}</span>
+        <textarea
+          className="textarea"
+          value={(value as string) || ""}
+          onChange={(e) => onChange(field.name, e.target.value)}
+          style={{ minHeight: 60, fontSize: 12 }}
+          placeholder={field.description}
+        />
+      </label>
+    );
+  }
+
   return (
     <label className="label">
-      <span style={{ fontSize: 12 }}>{label}</span>
+      <span style={{ fontSize: 12 }}>{field.label}</span>
       <input
         className="input"
-        type={prop.format === "date" ? "date" : "text"}
+        type={field.type === "date" ? "text" : "text"}
         value={(value as string) || ""}
-        onChange={(e) => onChange(propKey, e.target.value)}
+        onChange={(e) => onChange(field.name, e.target.value)}
         style={{ fontSize: 12 }}
-        placeholder={prop.description}
+        placeholder={field.description || field.label}
       />
     </label>
   );
@@ -114,6 +128,10 @@ export default function EntriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef<string>("");
 
   const loadEntries = useCallback(async () => {
     const res = await fetch("/api/entries", { cache: "no-store" });
@@ -123,34 +141,91 @@ export default function EntriesPage() {
 
   const loadSchemas = useCallback(async () => {
     const res = await fetch("/api/entries/types", { cache: "no-store" });
-    const json = (await res.json()) as Record<string, Schema>;
-    setSchemas(json);
+    const json = (await res.json()) as { types: string[]; schemas: Record<string, Schema> };
+    setSchemas(json.schemas || {});
   }, []);
 
   useEffect(() => {
     Promise.all([loadEntries(), loadSchemas()]).catch((e) => setError(String(e)));
   }, [loadEntries, loadSchemas]);
 
-  async function handleSubmit() {
-    setError(null);
-    const url = editId ? `/api/entries/${editId}` : "/api/entries";
-    const method = editId ? "PUT" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        type: formType,
-        data: formData,
-        tags: formTags.split(",").map((t) => t.trim()).filter(Boolean),
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      setError(err);
+  // Autosave effect for editing
+  const saveEntry = useCallback(async (
+    entryId: string, 
+    data: Record<string, unknown>, 
+    tags: string[]
+  ) => {
+    const dataToSave = JSON.stringify({ data, tags });
+    if (dataToSave === lastSavedRef.current) {
       return;
     }
-    await loadEntries();
-    resetForm();
+
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(`/api/entries/${entryId}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ data, tags }),
+      });
+      if (!res.ok) {
+        throw new Error(`Save failed: ${res.status}`);
+      }
+      lastSavedRef.current = dataToSave;
+      setSaveStatus("saved");
+      await loadEntries();
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    } catch (e) {
+      setSaveStatus("error");
+      setError(String(e));
+    }
+  }, [loadEntries]);
+
+  // Trigger autosave when editing
+  useEffect(() => {
+    if (!editId) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    const tags = formTags.split(",").map((t) => t.trim()).filter(Boolean);
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveEntry(editId, formData, tags);
+    }, 600);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editId, formData, formTags, saveEntry]);
+
+  async function handleCreate() {
+    setError(null);
+    setSaveStatus("saving");
+    try {
+      const res = await fetch("/api/entries", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: formType,
+          data: formData,
+          tags: formTags.split(",").map((t) => t.trim()).filter(Boolean),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+      await loadEntries();
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+      resetForm();
+    } catch (e) {
+      setSaveStatus("error");
+      setError(String(e));
+    }
   }
 
   async function deleteEntry(id: string) {
@@ -164,12 +239,16 @@ export default function EntriesPage() {
     setFormType(e.type);
     setFormData(e.data || {});
     setFormTags((e.tags || []).join(", "));
+    lastSavedRef.current = JSON.stringify({ data: e.data, tags: e.tags });
+    setSaveStatus("idle");
   }
 
   function resetForm() {
     setEditId(null);
     setFormData({});
     setFormTags("");
+    lastSavedRef.current = "";
+    setSaveStatus("idle");
   }
 
   function handleFieldChange(key: string, value: unknown) {
@@ -194,12 +273,13 @@ export default function EntriesPage() {
       {/* Header */}
       <div style={{ flexShrink: 0 }}>
         <h1 style={{ margin: 0, fontSize: 22, letterSpacing: -0.5 }}>Entries</h1>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
-          Building blocks for your CV
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4, display: "flex", alignItems: "center", gap: 12 }}>
+          <span>Building blocks for your CV</span>
+          {editId && <SaveIndicator status={saveStatus} error={error} />}
         </div>
       </div>
 
-      {error && <div className="error" style={{ flexShrink: 0 }}>{error}</div>}
+      {error && saveStatus !== "error" && <div className="error" style={{ flexShrink: 0 }}>{error}</div>}
 
       {/* Main area */}
       <div style={{ flex: 1, display: "grid", gridTemplateColumns: "260px 1fr", gap: 12, minHeight: 0, overflow: "hidden" }}>
@@ -207,8 +287,19 @@ export default function EntriesPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, overflow: "hidden" }}>
           <div className="card" style={{ flexShrink: 0 }}>
             <div style={{ padding: 12 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>
-                {editId ? "Edit Entry" : "New Entry"}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>
+                  {editId ? "Edit Entry" : "New Entry"}
+                </div>
+                {editId && (
+                  <button 
+                    className="btn" 
+                    onClick={resetForm} 
+                    style={{ fontSize: 11, padding: "4px 8px" }}
+                  >
+                    + New
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label className="label">
@@ -243,28 +334,41 @@ export default function EntriesPage() {
           </div>
           <div className="card" style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-              {activeSchema && (
+              {activeSchema && activeSchema.fields ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {Object.entries(activeSchema.properties).map(([key, prop]) => (
+                  {activeSchema.fields.map((field) => (
                     <FormField
-                      key={key}
-                      propKey={key}
-                      prop={prop}
-                      value={formData[key]}
+                      key={field.name}
+                      field={field}
+                      value={formData[field.name]}
                       onChange={handleFieldChange}
                     />
                   ))}
                 </div>
+              ) : (
+                <div style={{ padding: 20, textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
+                  Select a type to see the form fields
+                </div>
               )}
             </div>
-            <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", gap: 8, flexShrink: 0 }}>
-              <button className="btn btnPrimary" onClick={handleSubmit} style={{ flex: 1, fontSize: 12 }}>
-                {editId ? "Update" : "Create"}
-              </button>
-              {editId && (
-                <button className="btn" onClick={resetForm} style={{ fontSize: 12 }}>Cancel</button>
-              )}
-            </div>
+            {!editId && (
+              <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
+                <button className="btn btnPrimary" onClick={handleCreate} style={{ width: "100%", fontSize: 12 }}>
+                  Create Entry
+                </button>
+              </div>
+            )}
+            {editId && (
+              <div style={{ padding: 12, borderTop: "1px solid rgba(255,255,255,0.1)", flexShrink: 0 }}>
+                <button 
+                  className="btn btnDanger" 
+                  onClick={() => deleteEntry(editId)} 
+                  style={{ width: "100%", fontSize: 12 }}
+                >
+                  Delete Entry
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -351,21 +455,6 @@ export default function EntriesPage() {
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }}
-                      style={{
-                        padding: "4px 8px",
-                        fontSize: 11,
-                        background: "rgba(255,77,109,0.1)",
-                        border: "1px solid rgba(255,77,109,0.3)",
-                        borderRadius: 6,
-                        color: "#ff4d6d",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                      }}
-                    >
-                      Delete
-                    </button>
                   </div>
                 </div>
               ))

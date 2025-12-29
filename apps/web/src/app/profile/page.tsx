@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAutosave, SaveIndicator } from "@/hooks/useAutosave";
 
 type Profile = {
   data: {
@@ -26,39 +27,36 @@ const empty: Profile = {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile>(empty);
-  const [error, setError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const data = profile.data ?? {};
   const personal = data.personal ?? {};
   const links = data.links ?? {};
   const content = data.content ?? {};
 
+  const saveProfile = useCallback(async (profileData: Profile["data"]) => {
+    const res = await fetch("/api/profile", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: profileData })
+    });
+    if (!res.ok) {
+      throw new Error(`Save failed: ${res.status}`);
+    }
+  }, []);
+
+  const { status, error, setInitialData } = useAutosave(profile.data, saveProfile, 600);
+
   async function load() {
     const res = await fetch("/api/profile", { cache: "no-store" });
     if (!res.ok) throw new Error(`Load failed: ${res.status}`);
     const json = (await res.json()) as Profile;
     setProfile(json);
-  }
-
-  async function save() {
-    setError(null);
-    const res = await fetch("/api/profile", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: profile.data })
-    });
-    if (!res.ok) {
-      setError(`Save failed: ${res.status}`);
-      return;
-    }
-    const json = (await res.json()) as Profile;
-    setProfile(json);
-    setSavedAt(new Date().toISOString());
+    setInitialData(json.data);
   }
 
   useEffect(() => {
-    load().catch((e) => setError(String(e)));
+    load().catch((e) => setLoadError(String(e)));
   }, []);
 
   const completeness = useMemo(() => {
@@ -75,30 +73,16 @@ export default function ProfilePage() {
     <div className="stack" style={{ gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, letterSpacing: -0.5, fontSize: 24 }}>Profile</h1>
-        <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-          Used in LaTeX + HTML exports. Completeness: <span className="badge">{completeness}</span>
+        <div className="muted" style={{ marginTop: 6, fontSize: 13, display: "flex", alignItems: "center", gap: 12 }}>
+          <span>Completeness: <span className="badge">{completeness}</span></span>
+          <SaveIndicator status={status} error={error} />
         </div>
       </div>
 
+      {loadError && <div className="error">{loadError}</div>}
+
       <div className="card">
         <div style={{ padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Changes auto-reflect in preview after save.
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn" onClick={() => load().catch((e) => setError(String(e)))}>
-                Reload
-              </button>
-              <button className="btn btnPrimary" onClick={() => save().catch((e) => setError(String(e)))}>
-                Save
-              </button>
-            </div>
-          </div>
-
-          {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
-          {savedAt && <div className="muted" style={{ marginBottom: 16, fontSize: 12 }}>Saved at {savedAt}</div>}
-
           <div style={{ 
             display: "grid", 
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",

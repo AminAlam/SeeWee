@@ -34,3 +34,4 @@ class OllamaStubProvider(LlmProvider):
         return LlmResult(provider=self.name, output={"issues": []}, note="Stub consistency checks.")
 
 
+

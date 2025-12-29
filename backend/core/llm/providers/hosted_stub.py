@@ -41,3 +41,4 @@ class HostedStubProvider(LlmProvider):
         return LlmResult(provider=self.name, output={"issues": issues}, note="Stub consistency checks.")
 
 
+

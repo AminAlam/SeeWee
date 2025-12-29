@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -12,6 +13,8 @@ import {
   DragStartEvent,
   DragEndEvent,
   useDroppable,
+  useDraggable,
+  CollisionDetection,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -21,6 +24,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SaveIndicator } from "@/hooks/useAutosave";
 
 // Types
 type Entry = {
@@ -48,6 +52,8 @@ type Layout = {
 type ActiveDrag = 
   | { type: "entry"; entry: Entry }
   | { type: "section"; sectionId: string; label: string };
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const SECTION_OPTIONS = [
   { id: "experience", label: "Experience" },
@@ -88,23 +94,29 @@ function getEntrySubtitle(entry: Entry): string {
 }
 
 function LibraryEntry({ entry }: { entry: Entry }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `library-${entry.id}`,
     data: { type: "library", entry },
   });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
 
   return (
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        ...style,
         opacity: isDragging ? 0.5 : 1,
         padding: 10,
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.1)",
         borderRadius: 10,
         cursor: "grab",
+        touchAction: "none",
       }}
       {...attributes}
       {...listeners}
@@ -348,15 +360,40 @@ export default function VariantsPage() {
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [variantName, setVariantName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
 
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef<string>("");
+  const isInitialLoad = useRef(true);
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // Custom collision detection that prioritizes droppable sections
+  const customCollisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    
+    const activeData = args.active.data.current;
+    if (activeData?.type === "library") {
+      const sectionDrops = pointerCollisions.filter(
+        c => c.id.toString().startsWith("section-drop-")
+      );
+      if (sectionDrops.length > 0) {
+        return sectionDrops;
+      }
+    }
+    
+    if (pointerCollisions.length > 0) {
+      return pointerCollisions;
+    }
+    
+    return closestCenter(args);
+  };
 
   const entriesById = useMemo(() => {
     const map: Record<string, Entry> = {};
@@ -382,8 +419,74 @@ export default function VariantsPage() {
     return result;
   }, [entries, typeFilter, searchQuery, layout]);
 
-  // Section sortable IDs
   const sectionSortableIds = useMemo(() => sectionOrder.map(s => `section-sortable-${s}`), [sectionOrder]);
+
+  // Autosave effect
+  const saveLayout = useCallback(async (
+    variantId: string, 
+    layoutData: Record<string, string[]>, 
+    order: string[],
+    name: string,
+    originalName: string
+  ) => {
+    const orderedLayout: Record<string, string[]> = {};
+    order.forEach(s => {
+      orderedLayout[s] = layoutData[s] || [];
+    });
+
+    const dataToSave = JSON.stringify({ layout: orderedLayout, name });
+    if (dataToSave === lastSavedRef.current) {
+      return;
+    }
+
+    setSaveStatus("saving");
+    try {
+      await fetch(`/api/variants/${variantId}/layout`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sections: orderedLayout }),
+      });
+      
+      if (name !== originalName) {
+        await fetch(`/api/variants/${variantId}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        // Update the local variant record
+        setVariants(prev => prev.map(v => v.id === variantId ? { ...v, name } : v));
+        setSelectedVariant(prev => prev?.id === variantId ? { ...prev, name } : prev);
+      }
+      
+      lastSavedRef.current = dataToSave;
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    } catch (e) {
+      setSaveStatus("error");
+      setError(String(e));
+    }
+  }, []);
+
+  // Trigger autosave when layout, sectionOrder, or variantName changes
+  useEffect(() => {
+    if (!selectedVariant || isInitialLoad.current) {
+      return;
+    }
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      saveLayout(selectedVariant.id, layout, sectionOrder, variantName, selectedVariant.name);
+    }, 600);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [layout, sectionOrder, variantName, selectedVariant, saveLayout]);
 
   useEffect(() => {
     async function load() {
@@ -403,6 +506,7 @@ export default function VariantsPage() {
   }, []);
 
   async function selectVariant(variant: Variant, allEntries?: Entry[]) {
+    isInitialLoad.current = true;
     setSelectedVariant(variant);
     setVariantName(variant.name);
     const layoutRes = await fetch(`/api/variants/${variant.id}/layout`, { cache: "no-store" });
@@ -410,42 +514,16 @@ export default function VariantsPage() {
     if (Object.keys(layoutData.sections).length > 0) {
       setLayout(layoutData.sections);
       setSectionOrder(Object.keys(layoutData.sections));
+      lastSavedRef.current = JSON.stringify({ layout: layoutData.sections, name: variant.name });
     } else {
       const initialLayout: Record<string, string[]> = {};
       variant.sections.forEach((s) => { initialLayout[s] = []; });
       setLayout(initialLayout);
       setSectionOrder(variant.sections);
+      lastSavedRef.current = JSON.stringify({ layout: initialLayout, name: variant.name });
     }
-  }
-
-  async function saveLayout() {
-    if (!selectedVariant) return;
-    setIsSaving(true);
-    setError(null);
-    try {
-      // Rebuild layout in correct order
-      const orderedLayout: Record<string, string[]> = {};
-      sectionOrder.forEach(s => {
-        orderedLayout[s] = layout[s] || [];
-      });
-      
-      await fetch(`/api/variants/${selectedVariant.id}/layout`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sections: orderedLayout }),
-      });
-      if (variantName !== selectedVariant.name) {
-        await fetch(`/api/variants/${selectedVariant.id}`, {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: variantName }),
-        });
-      }
-      const variantsRes = await fetch("/api/variants", { cache: "no-store" });
-      setVariants(await variantsRes.json());
-    } finally {
-      setIsSaving(false);
-    }
+    // Allow autosave after initial load
+    setTimeout(() => { isInitialLoad.current = false; }, 100);
   }
 
   async function createNewVariant() {
@@ -530,7 +608,7 @@ export default function VariantsPage() {
       return;
     }
 
-    // Entry from library to section
+    // Entry from library to section drop zone
     if (activeData?.type === "library" && overData?.type === "section-drop") {
       const entry = activeData.entry as Entry;
       const sectionId = overData.sectionId as string;
@@ -540,11 +618,32 @@ export default function VariantsPage() {
       return;
     }
 
+    // Entry from library dropped onto an entry in a section
+    if (activeData?.type === "library" && overData?.type === "entry-in-section") {
+      const entry = activeData.entry as Entry;
+      const overEntry = overData.entry as Entry;
+      
+      let targetSection: string | null = null;
+      for (const [sectionId, entryIds] of Object.entries(layout)) {
+        if (entryIds.includes(overEntry.id)) {
+          targetSection = sectionId;
+          break;
+        }
+      }
+      
+      if (targetSection && !layout[targetSection].includes(entry.id)) {
+        const newSection = [...layout[targetSection]];
+        const overIndex = newSection.indexOf(overEntry.id);
+        newSection.splice(overIndex, 0, entry.id);
+        setLayout({ ...layout, [targetSection]: newSection });
+      }
+      return;
+    }
+
     // Entry reordering within/between sections
     if (activeData?.type === "entry-in-section") {
       const activeEntry = activeData.entry as Entry;
       
-      // Find which section the active entry is in
       let activeSection: string | null = null;
       for (const [sectionId, entryIds] of Object.entries(layout)) {
         if (entryIds.includes(activeEntry.id)) {
@@ -555,11 +654,9 @@ export default function VariantsPage() {
       
       if (!activeSection) return;
 
-      // Dropping on a section drop zone
       if (overData?.type === "section-drop") {
         const targetSection = overData.sectionId as string;
         if (activeSection !== targetSection) {
-          // Move entry to end of target section
           const newFromSection = layout[activeSection].filter(id => id !== activeEntry.id);
           const newToSection = [...layout[targetSection], activeEntry.id];
           setLayout({ ...layout, [activeSection]: newFromSection, [targetSection]: newToSection });
@@ -567,7 +664,6 @@ export default function VariantsPage() {
         return;
       }
 
-      // Dropping on another entry
       if (overData?.type === "entry-in-section") {
         const overEntry = overData.entry as Entry;
         let overSection: string | null = null;
@@ -581,12 +677,10 @@ export default function VariantsPage() {
         if (!overSection) return;
 
         if (activeSection === overSection) {
-          // Reorder within same section
           const oldIndex = layout[activeSection].indexOf(activeEntry.id);
           const newIndex = layout[activeSection].indexOf(overEntry.id);
           setLayout({ ...layout, [activeSection]: arrayMove(layout[activeSection], oldIndex, newIndex) });
         } else {
-          // Move between sections
           const newFromSection = layout[activeSection].filter(id => id !== activeEntry.id);
           const newToSection = [...layout[overSection]];
           const overIndex = newToSection.indexOf(overEntry.id);
@@ -599,7 +693,6 @@ export default function VariantsPage() {
 
   async function exportLatex() {
     if (!selectedVariant) return;
-    await saveLayout();
     const res = await fetch(`/api/variants/${selectedVariant.id}/export/latex`, { method: "POST" });
     if (res.ok) {
       const blob = await res.blob();
@@ -617,7 +710,7 @@ export default function VariantsPage() {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={customCollisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
@@ -625,8 +718,9 @@ export default function VariantsPage() {
         {/* Header */}
         <div style={{ flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 22, letterSpacing: -0.5 }}>Variant Builder</h1>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
-            Drag entries into sections • Drag sections to reorder
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4, display: "flex", alignItems: "center", gap: 12 }}>
+            <span>Drag entries into sections • Drag sections to reorder</span>
+            <SaveIndicator status={saveStatus} error={error} />
           </div>
         </div>
 
@@ -643,7 +737,7 @@ export default function VariantsPage() {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select
               className="select"
               value={selectedVariant?.id || ""}
@@ -667,23 +761,21 @@ export default function VariantsPage() {
               </button>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <input
               className="input"
               value={variantName}
               onChange={(e) => setVariantName(e.target.value)}
-              style={{ width: 120, padding: "6px 10px", fontSize: 12 }}
+              placeholder="Variant name"
+              style={{ width: 140, padding: "6px 10px", fontSize: 12 }}
             />
-            <button className="btn btnPrimary" onClick={saveLayout} disabled={isSaving || !selectedVariant} style={{ fontSize: 12, padding: "6px 12px" }}>
-              {isSaving ? "..." : "Save"}
-            </button>
             <button className="btn" onClick={exportLatex} disabled={!selectedVariant} style={{ fontSize: 12, padding: "6px 12px" }}>
               Export
             </button>
           </div>
         </div>
 
-        {error && <div className="error" style={{ flexShrink: 0 }}>{error}</div>}
+        {error && saveStatus !== "error" && <div className="error" style={{ flexShrink: 0 }}>{error}</div>}
 
         {/* Main area */}
         <div style={{ flex: 1, display: "flex", gap: 12, minHeight: 0, overflow: "hidden" }}>

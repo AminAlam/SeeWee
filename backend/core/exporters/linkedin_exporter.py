@@ -6,6 +6,7 @@ from io import StringIO
 from typing import Any
 
 from core.document_model import Document, DocItem
+from core.markdown_utils import md_to_plain
 
 
 def _as_str(v: Any) -> str:
@@ -17,10 +18,12 @@ def _as_str(v: Any) -> str:
 
 
 def _join_bullets(item: DocItem) -> str:
+    """Join bullet points, converting any markdown to plain text."""
     data = item.data or {}
     highlights = data.get("highlights")
     if isinstance(highlights, list):
-        bullets = [_as_str(x).strip() for x in highlights if _as_str(x).strip()]
+        # Convert each bullet from markdown to plain text
+        bullets = [md_to_plain(_as_str(x)).strip() for x in highlights if _as_str(x).strip()]
         return "\n".join(f"- {b}" for b in bullets)
     return ""
 

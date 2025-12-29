@@ -46,5 +46,3 @@ Controlled by `SEEWEE_LLM_MODE=hosted|ollama|both` (default in `docker-compose.y
 ### Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-

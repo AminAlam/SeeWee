@@ -31,7 +31,7 @@
 
 {% if summary %}
 \cvsection{Executive Summary}
-{{ summary | tex_escape }}
+{{ summary }}
 {% endif %}
 
 {% for section in sections %}
@@ -46,7 +46,7 @@
 {% if item.highlights %}
 \begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
 {% for h in item.highlights %}
-\item {{ h | tex_escape }}
+\item {{ h }}
 {% endfor %}
 \end{itemize}
 {% endif %}
@@ -57,11 +57,11 @@
 {% elif item.type == 'education' %}
 \textbf{ {{- item.school | tex_escape -}} } \hfill {{ item._dates | default(item.dates, true) | tex_escape }} \\
 {{ item.degree | tex_escape }}{% if item.gpa %} $\vert$ GPA: {{ item.gpa | tex_escape }}{% endif %} \\
-{% if item.honors %}\textit{ {{- item.honors | tex_escape -}} }{% endif %}
+{% if item.honors %}\textit{ {{- item.honors -}} }{% endif %}
 {% if item.highlights %}
 \begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
 {% for h in item.highlights %}
-\item {{ h | tex_escape }}
+\item {{ h }}
 {% endfor %}
 \end{itemize}
 {% endif %}
@@ -77,7 +77,7 @@
 {% if item.highlights %}
 \begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
 {% for h in item.highlights %}
-\item {{ h | tex_escape }}
+\item {{ h }}
 {% endfor %}
 \end{itemize}
 {% endif %}
@@ -106,7 +106,7 @@
 {# ============== AWARD ============== #}
 {% elif item.type == 'award' %}
 {% if loop.first %}\begin{itemize}[leftmargin=0.2in, itemsep=0.05in]{% endif %}
-\item \textbf{ {{- item.title | tex_escape -}} }{% if item.date %} ({{ item.date | tex_escape }}){% endif %}{% if item.issuer %} -- {{ item.issuer | tex_escape }}{% endif %}{% if item.description %}: {{ item.description | tex_escape }}{% endif %}
+\item \textbf{ {{- item.title | tex_escape -}} }{% if item.date %} ({{ item.date | tex_escape }}){% endif %}{% if item.issuer %} -- {{ item.issuer | tex_escape }}{% endif %}{% if item.description %}: {{ item.description }}{% endif %}
 {% if loop.last %}\end{itemize}{% endif %}
 
 {# ============== VOLUNTEERING ============== #}
@@ -115,7 +115,7 @@
 {% if item.highlights %}
 \begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
 {% for h in item.highlights %}
-\item {{ h | tex_escape }}
+\item {{ h }}
 {% endfor %}
 \end{itemize}
 {% endif %}
@@ -159,7 +159,7 @@
 {% if item.bullets %}
 \begin{itemize}[leftmargin=0.2in, itemsep=0.05in]
 {% for b in item.bullets %}
-\item {{ b | tex_escape }}
+\item {{ b }}
 {% endfor %}
 \end{itemize}
 {% endif %}
